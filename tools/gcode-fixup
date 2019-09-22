@@ -1,0 +1,259 @@
+#!/bin/sh
+# This script retrieves the signal strength from M3/M4 and places it on G1
+# lines, then removes these M3/M4 lines so that GRBL doesn't stop anymore. It
+# also removes redundant feed rates for G1 lines to compact the output. It
+# removes the G28 which can cause the laser to home at the wrong place at the
+# end of the work, and will replace G92 with G92X0Y0Z0 to avoid an error.
+#
+# The principle of operations is simple:
+# - G commands are preparatory commands, they indicate how the next movement(s)
+#   will be performed
+# - M commands are misc/machine commands. Some of them change the modal state
+#   (0,3,4,5)
+# - other commands are used to update states (feed rate, spindle, x, y etc)
+# - a move it triggered on end of line if X/Y/Z changed
+#
+# Since we want to avoid any M3/M4/M5 command anywhere, except at the beginning
+# and at the end, we set the modal state very early and avoid it everywhere
+# else. M5 is replaced with S0. The feed rate command is removed if it's the
+# same as the previous known one (in order to compact the output and ease the
+# manual modification of these parameters).
+#
+
+power=1.0
+gamma=1.0
+offset=0
+feed=5000
+ratio=1.0
+xratio=1.0
+yratio=1.0
+zratio=1.0
+xoff=0.0
+yoff=0.0
+zoff=0.0
+
+usage() {
+    echo "Usage: gcode-fixup [args*] file.gcode > newfile.gcode"
+    echo "Arguments:"
+    echo "  -h | --help             display this help message"
+    echo "  -p | --power <ratio>    set this power ratio (def: $power)"
+    echo "  -o | --offset <ofs>     add this offset to output power (def: $offset)"
+    echo "  -g | --gamma <ratio>    adjust the signal gamma (def: $gamma)"
+    echo "  -f | --feed   <rate>    fix feed rate limit to <rate> mm/min (def: $feed)"
+    echo "  -s | --scale <ratio>    scale all dimensions by <ratio> (def: $ratio)"
+    echo "  -x | --xscale <ratio>   scale X dimensions by <ratio> (def: $xratio)"
+    echo "  -y | --yscale <ratio>   scale Y dimensions by <ratio> (def: $yratio)"
+    echo "  -z | --zscale <ratio>   scale Z dimensions by <ratio> (def: $zratio)"
+    echo "  -X | --xoff  <offset>   add <offset> to all X coordinates (def: $xoff)"
+    echo "  -Y | --yoff  <offset>   add <offset> to all Y coordinates (def: $yoff)"
+    echo "  -Z | --zoff  <offset>   add <offset> to all Z coordinates (def: $zoff)"
+    echo
+}
+
+while [ -n "${1}" -a -z "${1##-*}" ]; do
+    if [ "$1" = "-h" -o "$1" = "--help" ]; then
+        usage
+        exit 0
+    elif [ "$1" = "-p" -a -n "$2" ]; then
+        power="$2"
+        shift
+    elif [ "$1" = "-g" -a -n "$2" ]; then
+        gamma="$2"
+        shift
+    elif [ "$1" = "-o" -a -n "$2" ]; then
+        offset="$2"
+        shift
+    elif [ "$1" = "-f" -a -n "$2" ]; then
+        feed="$2"
+        shift
+    elif [ "$1" = "-s" -a -n "$2" ]; then
+        scale="$2"
+        shift
+    elif [ "$1" = "-x" -a -n "$2" ]; then
+        xscale="$2"
+        shift
+    elif [ "$1" = "-y" -a -n "$2" ]; then
+        yscale="$2"
+        shift
+    elif [ "$1" = "-z" -a -n "$2" ]; then
+        zscale="$2"
+        shift
+    elif [ "$1" = "-X" -a -n "$2" ]; then
+        xoff="$2"
+        shift
+    elif [ "$1" = "-Y" -a -n "$2" ]; then
+        yoff="$2"
+        shift
+    elif [ "$1" = "-Z" -a -n "$2" ]; then
+        zoff="$2"
+        shift
+    else
+        usage
+        exit 1
+    fi
+    shift
+done
+
+exec awk -v power=$power -v gamma=$gamma -v offset=$offset -v maxfeed=$feed \
+         -v scale=$scale -v xscale=$xscale -v yscale=$yscale -v zscale=$zscale \
+         -v xoff=$xoff -v yoff=$yoff -v zoff=$zoff '
+    BEGIN {
+        init = 0;
+        minx = maxx = miny = maxy = minz = maxz = maxs = "";
+
+        if (maxfeed == "") maxfeed = 400;
+        if (scale == "")   scale   = 1.0;
+        if (xscale == "")  xscale  = 1.0;
+        if (yscale == "")  yscale  = 1.0;
+        if (zscale == "")  zscale  = 1.0;
+        if (xoff == "")    xoff  = 0.0;
+        if (yoff == "")    yoff  = 0.0;
+        if (zoff == "")    zoff  = 0.0;
+        if (gamma == "")   gamma   = 1.0;
+        if (power == "")   power   = 1.0;
+        if (offset == "")  offset  = 0;
+
+        x = y = z = f = m = "";
+        g = s = 0;
+        news = newf = ""; // empty when unchanged
+        x = y = z = 0;
+        xknown = yknown = zknown = 0;
+    }
+    {
+        ng = nm = code = nx = ny = nz = "";
+        move = printed = 0;
+        $0 = gensub("([-0-9.])([^-0-9. ])", "\\1 \\2","g");
+        $0 = gensub("  ", " ","g");
+        split($0,a,";");
+        args = split(a[1],b," ");
+        for (arg = 1; arg <= args; arg++) {
+            cmd = toupper(substr(b[arg], 1, 1));
+            val = substr(b[arg], 2);
+            val = gensub("^[-0]*([0-9])", "\\1", "g", val)
+            val = gensub("\\.0*$", "", "g", val)
+            if (arg == 1)
+                code = cmd "" val;
+            if (cmd == "G") {
+                ng = int(val);
+                if (ng >= 0 && ng <= 3) {
+                   g = ng;
+                   ng = "";
+                }
+            }
+            else if (cmd == "M") {
+                nm = int(val);
+                if (nm >= 3 && nm <= 5) {
+                   if (nm == m)
+                       continue;
+                   if (nm == 5) {
+                       news = 0;
+                       continue;
+                   }
+                   m = nm;
+                }
+            }
+            else if (cmd == "X" && ng == "") {
+                val = val * scale * xscale + ((val != 0.0 || g > 0) ? xoff : 0);
+                nx = val;
+                if (xknown && nx == x)
+                   continue;
+                x = nx;
+                xknown = 1;
+                move = 1;
+            }
+            else if (cmd == "Y" && ng == "") {
+                val = val * scale * yscale + ((val != 0.0 || g > 0) ? yoff : 0);
+                ny = val;
+                if (yknown && ny == y)
+                   continue;
+                y = ny;
+                yknown = 1;
+                move = 1;
+            }
+            else if (cmd == "Z" && ng == "") {
+                val = val * scale * zscale + ((val != 0.0 || g > 0) ? zoff : 0);
+                nz = val;
+                if (zknown && nz == z)
+                   continue;
+                z = nz;
+                zknown = 1;
+                move = 1;
+            }
+            else if (cmd == "I" && ng == "") {
+                val = val * scale * xscale;
+                move = 1;
+                xknown = 0;
+            }
+            else if (cmd == "J" && ng == "") {
+                val = val * scale * yscale;
+                move = 1;
+                yknown = 0;
+            }
+            else if (cmd == "K" && ng == "") {
+                val = val * scale * zscale;
+                move = 1;
+                zknown = 0;
+            }
+            else if (cmd == "F") {
+                newf = int(val);
+                if (newf > maxfeed)
+                   newf = maxfeed;
+                continue;
+            }
+            else if (cmd == "S") {
+                news = int(((exp(log(1+val)/gamma)/exp(log(1+255)/gamma)*256-1)*power)+offset);
+                continue;
+            }
+            else if (cmd != "P" && cmd != "N") {
+                # consider that everything we do not know is a potential move
+                move = 1;
+                xknown = yknown = zknown = 0;
+            }
+
+            printf "%s%s ", cmd, val
+            printed = 1;
+        }
+        if (news != "" && move && g != 0) {
+            if (news != s) {
+                printf "S%s ", news;
+                printed = 1;
+                if (maxs == "" || news > maxs)
+                    maxs = s;
+            }
+            s = news;
+            news = "";
+        }
+        if (newf != "" && move && g != 0) {
+            if (newf != f) {
+                printf "F%s ", newf;
+                printed = 1;
+            }
+            f = newf;
+            newf = "";
+        }
+        if (ng == "" && g > 0) {
+            if (minx == "" || x < minx)
+                minx = x;
+            if (maxx == "" || x > maxx)
+                maxx = x;
+            if (miny == "" || y < miny)
+                miny = y;
+            if (maxy == "" || y > maxy)
+                maxy = y;
+            if (minz == "" || z < minz)
+                minz = z;
+            if (maxz == "" || z > maxz)
+                maxz = z;
+        }
+        if (ng == 92 && nx == "" && ny == "" && nz == "") {
+            printf "X0 Y0 Z0 "
+            printed = 1;
+        }
+        if (printed)
+            printf "\n";
+    }
+    END {
+        print "M05 S0";
+        printf "G0 X0 Y0 Z0\n";
+        printf "(minx=%f miny=%f minz=%f maxx=%f maxy=%f maxz=%f maxs=%u)\n", minx, miny, minz, maxx, maxy, maxz, maxs;
+    }' "$@"
