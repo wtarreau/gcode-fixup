@@ -120,7 +120,7 @@ exec awk -v power=$power -v gamma=$gamma -v offset=$offset -v maxfeed=$feed \
         xknown = yknown = zknown = 0;
     }
     {
-        ng = nm = code = nx = ny = nz = "";
+        ng = nm = code = nx = ny = nz = line = "";
         move = printed = 0;
         $0 = gensub("([-0-9.])([^-0-9. ])", "\\1 \\2","g");
         $0 = gensub("  ", " ","g");
@@ -210,12 +210,13 @@ exec awk -v power=$power -v gamma=$gamma -v offset=$offset -v maxfeed=$feed \
                 xknown = yknown = zknown = 0;
             }
 
-            printf "%s%s ", cmd, val
-            printed = 1;
+            line = sprintf("%s%s%s%s", line, (line=="")?"":" ", cmd, val);
+            if (cmd != "G" || int(val) > 3)  # do not send empty G[0-3] commands
+                printed = 1;
         }
         if (news != "" && move && g != 0) {
             if (news != s) {
-                printf "S%s ", news;
+                line = sprintf("%s%sS%s", line, (line=="")?"":" ", news);
                 printed = 1;
                 if (maxs == "" || news > maxs)
                     maxs = s;
@@ -225,7 +226,7 @@ exec awk -v power=$power -v gamma=$gamma -v offset=$offset -v maxfeed=$feed \
         }
         if (newf != "" && move && g != 0) {
             if (newf != f) {
-                printf "F%s ", newf;
+                line = sprintf("%s%sF%s", line, (line=="")?"":" ", newf);
                 printed = 1;
             }
             f = newf;
@@ -246,11 +247,11 @@ exec awk -v power=$power -v gamma=$gamma -v offset=$offset -v maxfeed=$feed \
                 maxz = z;
         }
         if (ng == 92 && nx == "" && ny == "" && nz == "") {
-            printf "X0 Y0 Z0 "
+            line = sprintf("%s%sX0 Y0 Z0", line, (line=="")?"":" ");
             printed = 1;
         }
         if (printed)
-            printf "\n";
+            printf("%s\n", line);
     }
     END {
         print "M05 S0";
