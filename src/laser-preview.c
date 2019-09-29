@@ -7,6 +7,16 @@
 #include <png.h>
 
 
+/* describes an image with upgradable dimensions, possibly supporting negative
+ * coordinates.
+ */
+struct img {
+	int x0, x1; // x0 <= x1
+	int y0, y1; // y0 <= y1
+	float *area;
+};
+
+
 /* display the message and exit with the code */
 __attribute__((noreturn)) void die(int code, const char *format, ...)
 {
@@ -45,12 +55,12 @@ int write_gs_file(const char *file, int width, int height, const uint8_t *buffer
 
 
 /* crops a grayscale image in buffer <buffer>, expected to be <w>x<h> large, to
- * keep only (<x1>,<y1)-(<x2>,<y2>), all included. First columns and rows are
+ * keep only (<x0>,<y0)-(<x1>,<y1>), all included. First columns and rows are
  * numbered zero. Returns the output size in bytes on success, 0 on failure.
- * x1, x2, y1, y2 must be within the original buffer dimensions, with x1<=x2,
- * y1<=y2.
+ * x0, x1, y0, y1 must be within the original buffer dimensions, with x0<=x1,
+ * y0<=y1.
  */
-int crop_gs_image(uint8_t *buffer, int w, int h, int x1, int y1, int x2, int y2)
+int crop_gs_image(uint8_t *buffer, int w, int h, int x0, int y0, int x1, int y1)
 {
 	int row_pre, row_post;
 	uint8_t *src, *dst;
@@ -59,20 +69,20 @@ int crop_gs_image(uint8_t *buffer, int w, int h, int x1, int y1, int x2, int y2)
 	png_image image;
 	int x, y, ret;
 
-	if (w <= 0 || x1 < 0 || x2 < 0 || x1 >= w || x2 >= w || x1 > x2)
+	if (w <= 0 || x0 < 0 || x1 < 0 || x0 >= w || x1 >= w || x0 > x1)
 		return 0;
 
-	if (h <= 0 || y1 < 0 || y2 < 0 || y1 >= h || y2 >= h || y1 > y2)
+	if (h <= 0 || y0 < 0 || y1 < 0 || y0 >= h || y1 >= h || y0 > y1)
 		return 0;
 
-	row_pre = x1;
-	row_post = h - 1 - x2;
+	row_pre = x0;
+	row_post = h - 1 - x1;
 
 	src = dst = buffer;
-	src += y1 * w;
-	for (y = y1; y <= y2; y++) {
+	src += y0 * w;
+	for (y = y0; y <= y1; y++) {
 		src += row_pre;
-		for (x = x1; x <= x2; x++)
+		for (x = x0; x <= x1; x++)
 			*dst++ = *src++;
 		src += row_post;
 	}
@@ -80,10 +90,69 @@ int crop_gs_image(uint8_t *buffer, int w, int h, int x1, int y1, int x2, int y2)
 	return dst - buffer;
 }
 
+/* Extend img to cover (nx0,ny0)-(nx1,ny1) instead of img->(x0,y0)-(x1,y1).
+ * Shrinking is not supported and will be ignored. Returns non-zero on success,
+ * 0 on error (typically due to memory allocation). If the original buffer's
+ * area is not allocated, the image is considered not initialized and it will
+ * be initialized and allocated from the arguments.
+ */
+int extend_img(struct img *img, int nx0, int ny0, int nx1, int ny1)
+{
+	float *new_area;
+	int nw, nh;
+	int ow, oh;
+	int x, y;
+
+	if (img->area) {
+		if (nx0 > img->x0)
+			nx0 = img->x0;
+
+		if (ny0 > img->y0)
+			ny0 = img->y0;
+
+		if (nx1 < img->x1)
+			nx1 = img->x1;
+
+		if (ny1 < img->y1)
+			ny1 = img->y1;
+
+		if (nx0 == img->x0 && ny0 == img->y0 && nx1 == img->x1 && ny1 == img->y1)
+			return 1;
+
+		ow = img->x1 + 1 - img->x0;
+		oh = img->y1 + 1 - img->y0;
+	}
+
+	nw = nx1 + 1 - nx0;
+	nh = ny1 + 1 - ny0;
+
+	new_area = calloc(nw * nh, sizeof(*img->area));
+	if (!new_area)
+		return 0;
+
+	if (img->area) {
+		for (y = img->y0; y <= img->y1; y++) {
+			for (x = img->x0; x <= img->x1; x++) {
+				new_area[(y - ny0) * nw + (x - nx0)] =
+					img->area[(y - img->y0) * ow + (x - img->x0)];
+			}
+		}
+		free(img->area);
+	}
+
+	img->x0 = nx0;
+	img->y0 = ny0;
+	img->x1 = nx1;
+	img->y1 = ny1;
+	img->area = new_area;
+	return 1;
+}
+
 int main(int argc, char **argv)
 {
 	uint8_t *buffer;
 	const char *file;
+	struct img img;
 	int w, h;
 	int x, y;
 	int ret;
@@ -101,13 +170,23 @@ int main(int argc, char **argv)
 	if (argc > 3)
 		h = atoi(argv[3]);
 
+	memset(&img, 0, sizeof(img));
+	if (!extend_img(&img, 0, 0, w-1, h-1))
+		die(1, "out of memory\n");
+
 	buffer = calloc(w * h, 1);
 	if (!buffer)
 		die(1, "out of memory\n");
 
 	for (y = 0; y < h; y++) {
 		for (x = 0; x < w; x++) {
-			buffer[y * w + x] = 127.5 * y / h + 127.5 * x / w;
+			img.area[y * w + x] = 0.5 * y / h + 0.5 * x / w;
+		}
+	}
+
+	for (y = 0; y < h; y++) {
+		for (x = 0; x < w; x++) {
+			buffer[y * w + x] = img.area[y * w + x] * 255.0;
 		}
 	}
 
