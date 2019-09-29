@@ -186,7 +186,12 @@ int main(int argc, char **argv)
 
 	for (y = 0; y < h; y++) {
 		for (x = 0; x < w; x++) {
-			buffer[y * w + x] = img.area[y * w + x] * 255.0;
+			float v = img.area[y * w + x];
+			if (v < 0.0)
+				v = 0.0;
+			else if (v > 1.0)
+				v = 1.0;
+			buffer[y * w + x] = 255 - v * 255.0;
 		}
 	}
 
