@@ -153,20 +153,31 @@ int extend_img(struct img *img, int nx0, int ny0, int nx1, int ny1)
  */
 static inline int burn(struct img *img, float x, float y, float intensity)
 {
-	int x0, y0, x1, y1;
+	int x0, y0, x1, y1, w;
+	float dx, dy;
 	float s00, s01, s10, s11; // fraction of overlapping surface
 
-	x0 = (int)(x - 0.5); x1 = (int)(x + 0.5);
-	y0 = (int)(y - 0.5); y1 = (int)(y + 0.5);
+	w  = img->x1 - img->x0 + 1;
+	x0 = (int)(x - 0.5); x1 = x0 + 1;
+	y0 = (int)(y - 0.5); y1 = y0 + 1;
 
-	/* FIXME, still wrong */
-	//s00 = (x0 - x + 0.5) * (y0 - y + 0.5);
-	//s01 = (x0 - x + 0.5) * (y + 0.5 - y1);
-	//s10 = (x + 0.5 - x1) * (y0 - y + 0.5);
-	//s11 = (x + 0.5 - x1) * (y + 0.5 - y1);
+	if (x0 < img->x0 || x1 > img->x1 || y0 < img->y0 || y1 > img->y1) {
+		if (!extend_img(img, x0, y0, x1, y1))
+			return 0;
+	}
 
-	/* FIXME: wrong values, and test for the need to extend */
-	img->area[(y0 - img->y0) * (img->x1 - img->x0 + 1) + (x0 - img->x0)] += intensity;
+	dx = x1 - x;
+	dy = y1 - y;
+
+	s00 = (0.5 + dx) * (0.5 + dy);
+	s01 = (0.5 + dx) * (0.5 - dy);
+	s10 = (0.5 - dx) * (0.5 + dy);
+	s11 = (0.5 - dx) * (0.5 - dy);
+
+	img->area[(y0 - img->y0) * w + (x0 - img->x0)] += s00 * intensity;
+	img->area[(y0 - img->y0) * w + (x1 - img->x0)] += s01 * intensity;
+	img->area[(y1 - img->y0) * w + (x1 - img->x0)] += s10 * intensity;
+	img->area[(y1 - img->y0) * w + (x0 - img->x0)] += s11 * intensity;
 
 	/* FIXME: also pass feed speed to compute time spent on location */
 
@@ -235,7 +246,7 @@ int draw_vector(struct img *img, int x0, int y0, int x1, int y1, float intensity
 
 		for (x = x0 + 0.5; (int)x < x1 ; x += 1.0) {
 			/* aim the beam at (x,y) */
-			y = y0 + 0.5 + ystep * (x - x0 + 0.5 /* for mid-trip */);
+			y = y0 + ystep * (x - x0 + 0.5 /* for mid-trip */);
 			/* So beam overlaps with (x-0.5,y-0.5,x+0.5,y+0.5) */
 			if (!burn(img, x, y, intensity))
 				return 0;
@@ -253,7 +264,7 @@ int draw_vector(struct img *img, int x0, int y0, int x1, int y1, float intensity
 
 		for (y = y0 + 0.5; (int)y < y1 ; y += 1.0) {
 			/* aim the beam at (x, y+0.5) */
-			x = x0 + 0.5 + xstep * (y - y0 + 0.5 /* for mid-trip */);
+			x = x0 + xstep * (y - y0 + 0.5 /* for mid-trip */);
 			/* So beam overlaps with (x-0.5,y-0.5,x+0.5,y+0.5) */
 			if (!burn(img, x, y, intensity))
 				return 0;
@@ -297,9 +308,9 @@ int main(int argc, char **argv)
 		}
 	}
 
-	draw_vector(&img, 300,300,500,600, 255);
-	draw_vector(&img, 300,300,600,600, 255);
-	draw_vector(&img, 300,300,600,500, 255);
+	draw_vector(&img, 300,300,500,600, 1.0);
+	draw_vector(&img, 300,300,600,600, 1.0);
+	draw_vector(&img, 300,300,600,500, 1.0);
 
 	for (y = 0; y < h; y++) {
 		for (x = 0; x < w; x++) {
