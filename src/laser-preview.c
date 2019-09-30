@@ -14,6 +14,8 @@ struct img {
 	int x0, x1; // x0 <= x1
 	int y0, y1; // y0 <= y1
 	float *area;
+	float absorption; // 0..1, depends on the material
+	float absorption_factor; //-x..+x, depends on the material
 };
 
 
@@ -174,18 +176,45 @@ static inline int burn(struct img *img, float x, float y, float intensity)
 	s10 = (0.5 - dx) * (0.5 + dy);
 	s11 = (0.5 - dx) * (0.5 - dy);
 
-	img->area[(y0 - img->y0) * w + (x0 - img->x0)] += s00 * intensity;
-	img->area[(y0 - img->y0) * w + (x1 - img->x0)] += s01 * intensity;
-	img->area[(y1 - img->y0) * w + (x1 - img->x0)] += s10 * intensity;
-	img->area[(y1 - img->y0) * w + (x0 - img->x0)] += s11 * intensity;
+	s00 *= intensity;
+	s01 *= intensity;
+	s10 *= intensity;
+	s11 *= intensity;
 
-	/* FIXME: also pass feed speed to compute time spent on location */
+	/* next steps: count energy delivered by the beam as intensity * time * ratio * absorption.
+	 * For now, time has to be passed as part of the intensity by the caller. The absorption
+	 * depends on the material and the previous intensity applied to an absorption factor.
+	 * Typically painted aluminum will have a 1.0 absorption and a -1.0 factor indicating it
+	 * doesn't absorb anymore once fully engraved, while cleaer wood will have 0.25 and a 2.0
+	 * factor indicating it becomes much more sensitive once already engraved.
+	 */
+	s00 *= img->absorption + img->absorption_factor * img->area[(y0 - img->y0) * w + (x0 - img->x0)];
+	s01 *= img->absorption + img->absorption_factor * img->area[(y0 - img->y0) * w + (x1 - img->x0)];
+	s10 *= img->absorption + img->absorption_factor * img->area[(y1 - img->y0) * w + (x1 - img->x0)];
+	s11 *= img->absorption + img->absorption_factor * img->area[(y1 - img->y0) * w + (x0 - img->x0)];
 
-	/* next steps: count energy delivered by the beam as intensity * time * ratio * absorption */
-	/* Don't forget that absorption is a function of the current energy of the cell since it
-	 * can change color.
-	 *
-	 * Then we have diffusion to surrounding pixels, which is a function of their distance
+	if (img->absorption_factor < 0.0) {
+		if (s00 < 0.0) s00 = 0.0;
+		if (s01 < 0.0) s01 = 0.0;
+		if (s10 < 0.0) s10 = 0.0;
+		if (s11 < 0.0) s11 = 0.0;
+	}
+
+	if (s00 > 1.0) s00 = 1.0;
+	if (s01 > 1.0) s01 = 1.0;
+	if (s10 > 1.0) s10 = 1.0;
+	if (s11 > 1.0) s11 = 1.0;
+
+	/* now sXX contains the amount of energy delivered over pixel XX. For
+	 * now we don't really care if areas are overburnt, better properly
+	 * count the delivered energy.
+	 */
+	img->area[(y0 - img->y0) * w + (x0 - img->x0)] += s00;
+	img->area[(y0 - img->y0) * w + (x1 - img->x0)] += s01;
+	img->area[(y1 - img->y0) * w + (x1 - img->x0)] += s10;
+	img->area[(y1 - img->y0) * w + (x0 - img->x0)] += s11;
+
+	/* Then we have diffusion to surrounding pixels, which is a function of their distance
 	 * and depends on the material. Long dispersion means the energy is exchanged to other
 	 * places thus there is less locally and more remotely. Short dispersion means we only
 	 * burn under the beam. Ideally the dispersion should take the time into account so that
@@ -295,6 +324,13 @@ int main(int argc, char **argv)
 		h = atoi(argv[3]);
 
 	memset(&img, 0, sizeof(img));
+
+	/* clear wood: little absorption first, then takes way more once
+	 * already burnt.
+	 */
+	img.absorption = 0.25;
+	img.absorption_factor = 2.0;
+
 	if (!extend_img(&img, 0, 0, w-1, h-1))
 		die(1, "out of memory\n");
 
@@ -308,9 +344,9 @@ int main(int argc, char **argv)
 		}
 	}
 
-	draw_vector(&img, 300,300,500,600, 1.0);
-	draw_vector(&img, 300,300,600,600, 1.0);
-	draw_vector(&img, 300,300,600,500, 1.0);
+	draw_vector(&img, 125, 125, 500, 600, 1.0);
+	draw_vector(&img, 125, 125, 600, 600, 1.0);
+	draw_vector(&img, 125, 125, 600, 500, 1.0);
 
 	for (y = 0; y < h; y++) {
 		for (x = 0; x < w; x++) {
