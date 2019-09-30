@@ -1,4 +1,5 @@
 /* Uses the simplified API, thus requires libpng 1.6 or above */
+#include <math.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -16,6 +17,9 @@ struct img {
 	float *area;
 	float absorption; // 0..1, depends on the material
 	float absorption_factor; //-x..+x, depends on the material
+	float diffusion_lin;     // linear diffusion (ratio of power sent over 1px dist)
+	float diffusion_dia;     // diagonal diffusion (lin^sqrt(2)).
+	float diffusion;         // diffusion factor so that 4lin+4dia+diff == 1.0
 };
 
 
@@ -150,6 +154,35 @@ int extend_img(struct img *img, int nx0, int ny0, int nx1, int ny1)
 	return 1;
 }
 
+/* add energy <value> to pixel at <x,y> */
+static inline void add_to_pixel(struct img *img, int x0, int y0, float value)
+{
+	if (x0 < img->x0)
+		extend_img(img, x0, img->y0, img->x1, img->y1);
+	if (x0 > img->x1)
+		extend_img(img, img->x0, img->y0, x0, img->y1);
+	if (y0 < img->y0)
+		extend_img(img, img->x0, y0, img->x1, img->y1);
+	if (y0 > img->y1)
+		extend_img(img, img->x0, img->y0, img->x1, y0);
+
+	img->area[(y0 - img->y0) * (img->x1 - img->x0 + 1) + (x0 - img->x0)] += value * img->diffusion;
+
+	if (value < 0.05)
+		return;
+
+	add_to_pixel(img, x0 - 1, y0 - 1, value * img->diffusion_dia * img->diffusion);
+	add_to_pixel(img, x0 + 0, y0 - 1, value * img->diffusion_lin * img->diffusion);
+	add_to_pixel(img, x0 + 1, y0 - 1, value * img->diffusion_dia * img->diffusion);
+
+	add_to_pixel(img, x0 - 1, y0 + 0, value * img->diffusion_lin * img->diffusion);
+	add_to_pixel(img, x0 + 1, y0 + 0, value * img->diffusion_lin * img->diffusion);
+
+	add_to_pixel(img, x0 - 1, y0 + 1, value * img->diffusion_dia * img->diffusion);
+	add_to_pixel(img, x0 + 0, y0 + 1, value * img->diffusion_lin * img->diffusion);
+	add_to_pixel(img, x0 + 1, y0 + 1, value * img->diffusion_dia * img->diffusion);
+}
+
 /* mark the 1x1 area around (x,y) as burnt, taking the intensity and overlap
  * into account. There can be up to 4 pixels affected.
  */
@@ -176,11 +209,6 @@ static inline int burn(struct img *img, float x, float y, float intensity)
 	s10 = (0.5 - dx) * (0.5 + dy);
 	s11 = (0.5 - dx) * (0.5 - dy);
 
-	s00 *= intensity;
-	s01 *= intensity;
-	s10 *= intensity;
-	s11 *= intensity;
-
 	/* next steps: count energy delivered by the beam as intensity * time * ratio * absorption.
 	 * For now, time has to be passed as part of the intensity by the caller. The absorption
 	 * depends on the material and the previous intensity applied to an absorption factor.
@@ -205,14 +233,19 @@ static inline int burn(struct img *img, float x, float y, float intensity)
 	if (s10 > 1.0) s10 = 1.0;
 	if (s11 > 1.0) s11 = 1.0;
 
+	s00 *= intensity;
+	s01 *= intensity;
+	s10 *= intensity;
+	s11 *= intensity;
+
 	/* now sXX contains the amount of energy delivered over pixel XX. For
 	 * now we don't really care if areas are overburnt, better properly
 	 * count the delivered energy.
 	 */
-	img->area[(y0 - img->y0) * w + (x0 - img->x0)] += s00;
-	img->area[(y0 - img->y0) * w + (x1 - img->x0)] += s01;
-	img->area[(y1 - img->y0) * w + (x1 - img->x0)] += s10;
-	img->area[(y1 - img->y0) * w + (x0 - img->x0)] += s11;
+	add_to_pixel(img, x0, y0, s00);
+	add_to_pixel(img, x1, y0, s01);
+	add_to_pixel(img, x0, y1, s10);
+	add_to_pixel(img, x1, y1, s11);
 
 	/* Then we have diffusion to surrounding pixels, which is a function of their distance
 	 * and depends on the material. Long dispersion means the energy is exchanged to other
@@ -310,9 +343,12 @@ int main(int argc, char **argv)
 	int x, y;
 	int ret;
 
+	memset(&img, 0, sizeof(img));
+
 	file = NULL;
 	w = 1000;
 	h = 1000;
+	img.diffusion_lin = 0.5;
 
 	if (argc > 1 && *argv[1])
 		file = argv[1];
@@ -323,7 +359,13 @@ int main(int argc, char **argv)
 	if (argc > 3)
 		h = atoi(argv[3]);
 
-	memset(&img, 0, sizeof(img));
+	if (argc > 4)
+		img.diffusion_lin = atof(argv[4]);
+
+	img.diffusion_dia = powf(img.diffusion_lin, sqrt(2));
+	img.diffusion = 1.0 / (1.0 + 4.0 * img.diffusion_dia + 4.0 * img.diffusion_lin);
+	/* thus we have diff*(1+4*dia+4*lin) = 1 */
+	printf("dif=%f lin=%f dia=%f\n", img.diffusion, img.diffusion_lin, img.diffusion_dia);
 
 	/* clear wood: little absorption first, then takes way more once
 	 * already burnt.
@@ -344,9 +386,9 @@ int main(int argc, char **argv)
 		}
 	}
 
-	draw_vector(&img, 125, 125, 500, 600, 1.0);
-	draw_vector(&img, 125, 125, 600, 600, 1.0);
-	draw_vector(&img, 125, 125, 600, 500, 1.0);
+	draw_vector(&img, 125, 125, 500, 600, 10.0);
+	draw_vector(&img, 125, 125, 600, 600, 10.0);
+	draw_vector(&img, 125, 125, 600, 500, 10.0);
 
 	for (y = 0; y < h; y++) {
 		for (x = 0; x < w; x++) {
