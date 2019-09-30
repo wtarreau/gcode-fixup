@@ -1,4 +1,5 @@
 /* Uses the simplified API, thus requires libpng 1.6 or above */
+#include <ctype.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -334,6 +335,75 @@ int draw_vector(struct img *img, int x0, int y0, int x1, int y1, float intensity
 	}
 }
 
+/* minimalistic parsing of a gcode file, applying <power> as a power ratio, and
+ * zoom to x & y coordinates.
+ * The feed time is not taken into account, only the spindle speed. Returns 0
+ * on error otherwise the number of lines read.
+ */
+int parse_gcode(struct img *img, FILE *file, float zoom, float power)
+{
+	char line[1024];
+	char *p, *e;
+	float val;
+	int drawing = 0;
+	float spindle;
+	float new_x = 0, new_y = 0;
+	float cur_x = 0, cur_y = 0;
+	int cur_s = 0;
+
+	while (fgets(line, sizeof(line), file) != NULL) {
+		for (p = line; *p; p = e) {
+			while (*p == ' ')
+				p++;
+
+			for (e = p; *e; e++) {
+				if (*e == '\n') {
+					*e = 0;
+					break;
+				}
+				if (*e == ' ') {
+					*e++ = 0;
+					break;
+				}
+			}
+			/* we have a word at <p> and <e> points to the next one */
+			*p = toupper(*p);
+			val = atof(p + 1);
+			if (*p == 'G') {
+				if (val == 0)
+					drawing = 0;
+				else if (val >= 1 && val <=3)
+					drawing = 1;
+			}
+			else if (*p == 'M') {
+				if (val == 3 || val == 4) {
+					drawing = 1;
+					cur_s = 255;
+				}
+				else if (val == 5)
+					drawing = 0;
+			}
+			else if (*p == 'X') {
+				new_x = val;
+			}
+			else if (*p == 'Y') {
+				new_y = val;
+			}
+			else if (*p == 'S') {
+				cur_s = val;
+			}
+		}
+
+		if (drawing && (new_x != cur_x || new_y != cur_y)) {
+			draw_vector(img, cur_x * zoom, cur_y * zoom, new_x * zoom, new_y * zoom, cur_s / 255.0 * power);
+		}
+
+		cur_x = new_x;
+		cur_y = new_y;
+	}
+	return 1;
+}
+
 int main(int argc, char **argv)
 {
 	uint8_t *buffer;
@@ -377,15 +447,23 @@ int main(int argc, char **argv)
 		die(1, "out of memory\n");
 
 	/* gradient for experimentation */
-	for (y = 0; y < h; y++) {
-		for (x = 0; x < w; x++) {
-			img.area[y * w + x] = 0.5 * y / h + 0.5 * x / w;
-		}
-	}
+	//for (y = 0; y < h; y++) {
+	//	for (x = 0; x < w; x++) {
+	//		img.area[y * w + x] = 0.5 * y / h + 0.5 * x / w;
+	//	}
+	//}
 
-	draw_vector(&img, 125, 125, 500, 600, 10.0);
-	draw_vector(&img, 125, 125, 600, 600, 10.0);
-	draw_vector(&img, 125, 125, 600, 500, 10.0);
+	//draw_vector(&img, 125, 125, 500, 600, 10.0);
+	//draw_vector(&img, 125, 125, 600, 600, 10.0);
+	//draw_vector(&img, 125, 125, 600, 500, 10.0);
+
+	if (!parse_gcode(&img, stdin, 10, 1.0))
+		die(1, "failed to process gcode");
+
+	printf("x0=%d y0=%d x1=%d y1=%d\n", img.x0, img.y0, img.x1, img.y1);
+
+	w = img.x1 - img.x0 + 1;
+	h = img.y1 - img.y0 + 1;
 
 	/* let's now recompute the new image size and allocate the PNG buffer */
 	w = img.x1 - img.x0 + 1;
@@ -407,9 +485,10 @@ int main(int argc, char **argv)
 		}
 	}
 
-	crop_gs_image(buffer, w, h, 100, 100, w - 1 - 100, h - 1 - 100);
+	//crop_gs_image(buffer, w, h, 100, 100, w - 1 - 100, h - 1 - 100);
+	//ret = write_gs_file(file, w-200, h-200, buffer);
 
-	ret = write_gs_file(file, w-200, h-200, buffer);
+	ret = write_gs_file(file, w, h, buffer);
 	if (!ret)
 		die(1, "failed to write file\n");
 	return 0;
