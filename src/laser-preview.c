@@ -376,10 +376,7 @@ int main(int argc, char **argv)
 	if (!extend_img(&img, 0, 0, w-1, h-1))
 		die(1, "out of memory\n");
 
-	buffer = calloc(w * h, 1);
-	if (!buffer)
-		die(1, "out of memory\n");
-
+	/* gradient for experimentation */
 	for (y = 0; y < h; y++) {
 		for (x = 0; x < w; x++) {
 			img.area[y * w + x] = 0.5 * y / h + 0.5 * x / w;
@@ -390,6 +387,15 @@ int main(int argc, char **argv)
 	draw_vector(&img, 125, 125, 600, 600, 10.0);
 	draw_vector(&img, 125, 125, 600, 500, 10.0);
 
+	/* let's now recompute the new image size and allocate the PNG buffer */
+	w = img.x1 - img.x0 + 1;
+	h = img.y1 - img.y0 + 1;
+
+	buffer = calloc(w * h, 1);
+	if (!buffer)
+		die(1, "out of memory\n");
+
+	/* convert the work area to a PNG buffer */
 	for (y = 0; y < h; y++) {
 		for (x = 0; x < w; x++) {
 			float v = img.area[y * w + x];
