@@ -129,7 +129,7 @@ exec awk -v power=$power -v gamma=$gamma -v offset=$offset -v maxfeed=$feed \
         for (arg = 1; arg <= args; arg++) {
             cmd = toupper(substr(b[arg], 1, 1));
             val = substr(b[arg], 2);
-            val = gensub("^[-0]*([0-9])", "\\1", "g", val)
+            val = gensub("^([-]*)[0]*([0-9])", "\\1\\2", "g", val)
             val = gensub("\\.0*$", "", "g", val)
             if (arg == 1)
                 code = cmd "" val;
