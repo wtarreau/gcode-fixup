@@ -121,10 +121,11 @@ exec awk -v power=$power -v gamma=$gamma -v offset=$offset -v maxfeed=$feed \
     }
     {
         ng = nm = code = nx = ny = nz = line = "";
-        move = printed = 0;
-        $0 = gensub("([-0-9.])([^-0-9. ])", "\\1 \\2","g");
-        $0 = gensub("  ", " ","g");
-        split($0,a,";");
+        move = printed = send_s = 0;
+        $0 = gensub("[(][^)]*[)]", "", "g");
+        split($0, a, ";");
+        a[1] = gensub("([-0-9.])([^-0-9. ])", "\\1 \\2", "g", a[1]);
+        a[1] = gensub("  ", " ", "g", a[1]);
         args = split(a[1],b," ");
         for (arg = 1; arg <= args; arg++) {
             cmd = toupper(substr(b[arg], 1, 1));
