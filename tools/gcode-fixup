@@ -150,6 +150,8 @@ exec awk -v power=$power -v gamma=$gamma -v offset=$offset -v maxfeed=$feed \
                        news = 0;
                        continue;
                    }
+		   if (m == "")
+		       send_s = 1;
                    m = nm;
                 }
             }
@@ -215,8 +217,8 @@ exec awk -v power=$power -v gamma=$gamma -v offset=$offset -v maxfeed=$feed \
             if (cmd != "G" || int(val) > 3)  # do not send empty G[0-3] commands
                 printed = 1;
         }
-        if (news != "" && move && g != 0) {
-            if (news != s) {
+        if (news != "" && (send_s || (move && g != 0))) {
+            if (news != s || send_s) {
                 line = sprintf("%s%sS%s", line, (line=="")?"":" ", news);
                 printed = 1;
                 if (maxs == "" || news > maxs)
