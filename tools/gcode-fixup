@@ -257,7 +257,7 @@ exec awk -v power=$power -v gamma=$gamma -v offset=$offset -v maxfeed=$feed \
             printf("%s\n", line);
     }
     END {
-        print "M05 S0";
+        print "M05";
         printf "G0 X0 Y0 Z0\n";
         printf "(minx=%f miny=%f minz=%f maxx=%f maxy=%f maxz=%f maxs=%u)\n", minx, miny, minz, maxx, maxy, maxz, maxs;
     }' "$@"
