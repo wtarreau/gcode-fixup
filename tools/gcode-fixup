@@ -147,7 +147,6 @@ exec awk -v power=$power -v gamma=$gamma -v offset=$offset -v maxfeed=$feed \
                    if (nm == m)
                        continue;
                    if (nm == 5) {
-                       news = 0;
                        continue;
                    }
 		   if (m == "")
