@@ -238,6 +238,7 @@ static inline int burn(struct img *img, double x, double y, float intensity)
 {
 	int x0, y0, x1, y1, w;
 	float s00, s01, s10, s11; // fraction of overlapping surface
+	double dx, dy;
 
 	/* depending on the rounding resulting from non-integer pixel sizes, we
 	 * can have some rounding issues below due to tiny fractional parts
@@ -273,12 +274,16 @@ static inline int burn(struct img *img, double x, double y, float intensity)
 	 * The distance cannot exceed sqrt(2), thus we normalize it so that
 	 * (1-distance) gives the intensity for each pixel.
 	 */
+	dx = x - (x0 + 0.5); // [0..1]
+	dy = y - (y0 + 0.5); // [0..1]
 
-	x += 0.5; y += 0.5;
-	s00 = 1.0 - sqrt(((x0 - x) * (x0 - x) + (y0 - y) * (y0 - y)) / 2);
-	s01 = 1.0 - sqrt(((x1 - x) * (x1 - x) + (y0 - y) * (y0 - y)) / 2);
-	s10 = 1.0 - sqrt(((x0 - x) * (x0 - x) + (y1 - y) * (y1 - y)) / 2);
-	s11 = 1.0 - sqrt(((x1 - x) * (x1 - x) + (y1 - y) * (y1 - y)) / 2);
+	s00 =       (dx) * (1.0 - dy);
+	s01 = (1.0 - dx) * (1.0 - dy);
+	s10 =       (dx) *       (dy);
+	s11 = (1.0 - dx) *       (dy);
+
+	//printf("x=%1.2f x0=%d x1=%d y=%1.2f y0=%d y1=%d s00=%1.1f s01=%1.1f s10=%1.1f s11=%1.1f\n",
+	//       x, x0, x1, y, y0, y1, s00, s01, s10, s11);
 
 	/* next steps: count energy delivered by the beam as intensity * time * ratio * absorption.
 	 * For now, time has to be passed as part of the intensity by the caller. The absorption
