@@ -458,10 +458,10 @@ int parse_gcode(struct img *img, FILE *file, double zoom, float power)
 					drawing = 0;
 			}
 			else if (*p == 'X') {
-				new_x = floor(val * zoom);
+				new_x = floor(val * zoom + zoom / 16);
 			}
 			else if (*p == 'Y') {
-				new_y = floor(val * zoom);
+				new_y = floor(val * zoom + zoom / 16);
 			}
 			else if (*p == 'S') {
 				cur_s = val;
