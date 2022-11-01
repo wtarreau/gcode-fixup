@@ -258,8 +258,8 @@ static inline int burn(struct img *img, float x, float y, float intensity)
 	 */
 	s00 *= img->absorption + img->absorption_factor * img->area[(y0 - img->y0) * w + (x0 - img->x0)];
 	s01 *= img->absorption + img->absorption_factor * img->area[(y0 - img->y0) * w + (x1 - img->x0)];
-	s10 *= img->absorption + img->absorption_factor * img->area[(y1 - img->y0) * w + (x1 - img->x0)];
-	s11 *= img->absorption + img->absorption_factor * img->area[(y1 - img->y0) * w + (x0 - img->x0)];
+	s10 *= img->absorption + img->absorption_factor * img->area[(y1 - img->y0) * w + (x0 - img->x0)];
+	s11 *= img->absorption + img->absorption_factor * img->area[(y1 - img->y0) * w + (x1 - img->x0)];
 
 	if (img->absorption_factor < 0.0) {
 		if (s00 < 0.0) s00 = 0.0;
