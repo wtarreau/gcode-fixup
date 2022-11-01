@@ -15,6 +15,12 @@
 #define DEFAULT_LIN_DIFF         0.5
 #define DEFAULT_PIX_SIZE         0.1
 
+/* clear wood: little absorption first, then takes way more once
+ * already burnt.
+ */
+#define DEFAULT_ABSORPTION        0.25
+#define DEFAULT_ABSORPTION_FACTOR 2.0
+
 const struct option long_options[] = {
 	{"help",        no_argument,       0, 'h'              },
 	{"diffusion",   required_argument, 0, 'd'              },
@@ -465,6 +471,8 @@ void usage(int code, const char *cmd)
 	    "  -h --help                    show this help\n"
 	    "  -H --height <size>           output image minimum height in pixels (def: 1000)\n"
 	    "  -W --width <size>            output image minimum width in pixels (def: 1000)\n"
+	    "  -a --absorption <value>      absorption (def: 0.25 for clear wood)\n"
+	    "  -A --absorption_mul <value>  absorption factor once marked (def: 2.0 for wood)\n"
 	    "  -d --diffusion <value>       linear diffusion ratio (def: 0.5)\n"
 	    "  -o --output <file>           output PNG file name (default: none=stdout)\n"
 	    "  -p --pixel-size <size>       pixel-size in millimeters (default: 0.1)\n"
@@ -488,10 +496,12 @@ int main(int argc, char **argv)
 	h = DEFAULT_HEIGHT;
 	pixsize = DEFAULT_PIX_SIZE;;
 	img.diffusion_lin = DEFAULT_LIN_DIFF;
+	img.absorption = DEFAULT_ABSORPTION;
+	img.absorption_factor = DEFAULT_ABSORPTION_FACTOR;
 
 	while (1) {
 		int option_index = 0;
-		int c = getopt_long(argc, argv, "hd:o:p:W:H:", long_options, &option_index);
+		int c = getopt_long(argc, argv, "ha:A:d:o:p:W:H:", long_options, &option_index);
 		double arg_f = optarg ? atof(optarg) : 0.0;
 		int arg_i   = optarg ? atoi(optarg) : 0;
 
@@ -500,6 +510,14 @@ int main(int argc, char **argv)
 
 		switch (c) {
 		case 0: /* long option: long_options[option_index] with arg <optarg> */
+			break;
+
+		case 'a':
+			img.absorption = arg_f;
+			break;
+
+		case 'A':
+			img.absorption_factor = arg_f;
 			break;
 
 		case 'd':
@@ -538,12 +556,6 @@ int main(int argc, char **argv)
 	img.diffusion = 1.0 / (1.0 + 4.0 * img.diffusion_dia + 4.0 * img.diffusion_lin);
 	/* thus we have diff*(1+4*dia+4*lin) = 1 */
 	printf("dif=%f lin=%f dia=%f\n", img.diffusion, img.diffusion_lin, img.diffusion_dia);
-
-	/* clear wood: little absorption first, then takes way more once
-	 * already burnt.
-	 */
-	img.absorption = 0.25;
-	img.absorption_factor = 2.0;
 
 	if (!extend_img(&img, 0, 0, w-1, h-1))
 		die(1, "out of memory\n");
