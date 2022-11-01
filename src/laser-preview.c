@@ -147,7 +147,16 @@ int extend_img(struct img *img, int nx0, int ny0, int nx1, int ny1)
 	nw = nx1 + 1 - nx0;
 	nh = ny1 + 1 - ny0;
 
-	new_area = calloc(nw * nh, sizeof(*img->area));
+	if (ow == nw && ny0 == img->y0) {
+		new_area = realloc(img->area, nw * nh * sizeof(*img->area));
+		if (new_area) {
+			memset(&new_area[oh * nw], 0, (nh - oh) * nw * sizeof(*img->area));
+			img->area = NULL;
+		}
+	}
+	else
+		new_area = calloc(nw * nh, sizeof(*img->area));
+
 	if (!new_area)
 		return 0;
 
