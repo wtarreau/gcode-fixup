@@ -13,6 +13,7 @@
 #define DEFAULT_WIDTH            1000
 #define DEFAULT_HEIGHT           1000
 #define DEFAULT_LIN_DIFF         0.5
+#define DEFAULT_PIX_SIZE         0.1
 
 const struct option long_options[] = {
 	{"help",        no_argument,       0, 'h'              },
@@ -20,6 +21,7 @@ const struct option long_options[] = {
 	{"width",       required_argument, 0, 'W'              },
 	{"height",      required_argument, 0, 'H'              },
 	{"output",      required_argument, 0, 'o'              },
+	{"pixel-size",  required_argument, 0, 'p'              },
 	{0,             0,                 0, 0                }
 };
 
@@ -467,6 +469,7 @@ void usage(int code, const char *cmd)
 	    "  -W --width <size>            output image minimum width in pixels (def: 1000)\n"
 	    "  -d --diffusion <value>       linear diffusion ratio (def: 0.5)\n"
 	    "  -o --output <file>           output PNG file name (default: none=stdout)\n"
+	    "  -p --pixel-size <size>       pixel-size in millimeters (default: 0.1)\n"
 	    "\n", cmd);
 }
 
@@ -475,6 +478,7 @@ int main(int argc, char **argv)
 	uint8_t *buffer;
 	const char *file;
 	struct img img;
+	float pixsize;
 	int w, h;
 	int x, y;
 	int ret;
@@ -484,11 +488,12 @@ int main(int argc, char **argv)
 	file = NULL;
 	w = DEFAULT_WIDTH;
 	h = DEFAULT_HEIGHT;
+	pixsize = DEFAULT_PIX_SIZE;;
 	img.diffusion_lin = DEFAULT_LIN_DIFF;
 
 	while (1) {
 		int option_index = 0;
-		int c = getopt_long(argc, argv, "hd:o:W:H:", long_options, &option_index);
+		int c = getopt_long(argc, argv, "hd:o:p:W:H:", long_options, &option_index);
 		float arg_f = optarg ? atof(optarg) : 0.0;
 		int arg_i   = optarg ? atoi(optarg) : 0;
 
@@ -509,6 +514,11 @@ int main(int argc, char **argv)
 
 		case 'o' :
 			file = optarg;
+			break;
+
+		case 'p':
+			if (arg_f > 0.0)
+				pixsize = arg_f;
 			break;
 
 		case 'W':
@@ -551,7 +561,7 @@ int main(int argc, char **argv)
 	//draw_vector(&img, 125, 125, 600, 600, 10.0);
 	//draw_vector(&img, 125, 125, 600, 500, 10.0);
 
-	if (!parse_gcode(&img, stdin, 10, 1.0))
+	if (!parse_gcode(&img, stdin, 1.0 / pixsize, 1.0))
 		die(1, "failed to process gcode");
 
 	printf("x0=%d y0=%d x1=%d y1=%d\n", img.x0, img.y0, img.x1, img.y1);
