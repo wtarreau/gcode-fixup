@@ -228,7 +228,7 @@ static inline void add_to_pixel(struct img *img, int x0, int y0, float value)
 /* mark the 1x1 area around (x,y) as burnt, taking the intensity and overlap
  * into account. There can be up to 4 pixels affected.
  */
-static inline int burn(struct img *img, float x, float y, float intensity)
+static inline int burn(struct img *img, double x, double y, float intensity)
 {
 	int x0, y0, x1, y1, w;
 	float s00, s01, s10, s11; // fraction of overlapping surface
@@ -343,17 +343,17 @@ static inline int burn(struct img *img, float x, float y, float intensity)
  *   +---+---+---+---+---+    +---+---+
  *
  */
-int draw_vector(struct img *img, float x0, float y0, float x1, float y1, float intensity)
+int draw_vector(struct img *img, double x0, double y0, double x1, double y1, double intensity)
 {
-	float dx = x1 - x0;
-	float dy = y1 - y0;
+	double dx = x1 - x0;
+	double dy = y1 - y0;
 
 	if (!dx && !dy)
 		return 1;
 
 	if (fabs(dx) >= fabs(dy)) {
 		/* must visit all X places */
-		float x, y;
+		double x, y;
 
 		if (dx < 0) {
 			dx = -dx;
@@ -370,7 +370,7 @@ int draw_vector(struct img *img, float x0, float y0, float x1, float y1, float i
 		}
 	} else {
 		/* must visit all Y places */
-		float x, y;
+		double x, y;
 
 		if (dy < 0) {
 			dy = -dy;
@@ -393,15 +393,15 @@ int draw_vector(struct img *img, float x0, float y0, float x1, float y1, float i
  * The feed time is not taken into account, only the spindle speed. Returns 0
  * on error otherwise the number of lines read.
  */
-int parse_gcode(struct img *img, FILE *file, float zoom, float power)
+int parse_gcode(struct img *img, FILE *file, double zoom, float power)
 {
 	char line[1024];
 	char *p, *e;
-	float val;
+	double val;
 	int drawing = 0;
-	float spindle;
-	float new_x = 0, new_y = 0;
-	float cur_x = 0, cur_y = 0;
+	double spindle;
+	double new_x = 0, new_y = 0;
+	double cur_x = 0, cur_y = 0;
 	int cur_s = 0;
 
 	while (fgets(line, sizeof(line), file) != NULL) {
@@ -476,7 +476,7 @@ int main(int argc, char **argv)
 	uint8_t *buffer;
 	const char *file;
 	struct img img;
-	float pixsize;
+	double pixsize;
 	int w, h;
 	int x, y;
 	int ret;
@@ -492,7 +492,7 @@ int main(int argc, char **argv)
 	while (1) {
 		int option_index = 0;
 		int c = getopt_long(argc, argv, "hd:o:p:W:H:", long_options, &option_index);
-		float arg_f = optarg ? atof(optarg) : 0.0;
+		double arg_f = optarg ? atof(optarg) : 0.0;
 		int arg_i   = optarg ? atoi(optarg) : 0;
 
 		if (c == -1)
