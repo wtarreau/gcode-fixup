@@ -343,46 +343,44 @@ static inline int burn(struct img *img, float x, float y, float intensity)
  *   +---+---+---+---+---+    +---+---+
  *
  */
-int draw_vector(struct img *img, int x0, int y0, int x1, int y1, float intensity)
+int draw_vector(struct img *img, float x0, float y0, float x1, float y1, float intensity)
 {
-	int dx = x1 - x0;
-	int dy = y1 - y0;
+	float dx = x1 - x0;
+	float dy = y1 - y0;
 
 	if (!dx && !dy)
 		return 1;
 
-	if (abs(dx) >= abs(dy)) {
+	if (fabs(dx) >= fabs(dy)) {
 		/* must visit all X places */
-		float x, y, ystep;
+		float x, y;
 
 		if (dx < 0) {
 			dx = -dx;
 			x0 = x1;
 			x1 = x0 + dx;
 		}
-		ystep = (float)dy / dx;
 
-		for (x = x0 + 0.5; (int)x < x1 ; x += 1.0) {
+		for (x = x0 + 0.5; x < x1 + 0.5; x += 1.0) {
 			/* aim the beam at (x,y) */
-			y = y0 + ystep * (x - x0 + 0.5 /* for mid-trip */);
+			y = y0 + (x - x0 + 0.5 /* for mid-trip */) * dy / dx;
 			/* So beam overlaps with (x-0.5,y-0.5,x+0.5,y+0.5) */
 			if (!burn(img, x, y, intensity))
 				return 0;
 		}
 	} else {
 		/* must visit all Y places */
-		float x, y, xstep;
+		float x, y;
 
 		if (dy < 0) {
 			dy = -dy;
 			y0 = y1;
 			y1 = y0 + dy;
 		}
-		xstep = (float)dx / dy;
 
-		for (y = y0 + 0.5; (int)y < y1 ; y += 1.0) {
+		for (y = y0 + 0.5; y < y1 + 0.5; y += 1.0) {
 			/* aim the beam at (x, y+0.5) */
-			x = x0 + xstep * (y - y0 + 0.5 /* for mid-trip */);
+			x = x0 + (y - y0 + 0.5 /* for mid-trip */) * dx / dy;
 			/* So beam overlaps with (x-0.5,y-0.5,x+0.5,y+0.5) */
 			if (!burn(img, x, y, intensity))
 				return 0;
