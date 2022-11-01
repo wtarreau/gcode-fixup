@@ -239,6 +239,15 @@ static inline int burn(struct img *img, double x, double y, float intensity)
 	int x0, y0, x1, y1, w;
 	float s00, s01, s10, s11; // fraction of overlapping surface
 
+	/* depending on the rounding resulting from non-integer pixel sizes, we
+	 * can have some rounding issues below due to tiny fractional parts
+	 * causing some pixels to happen at the wrong place (often a line).
+	 * We don't need too much sub-pixel precision, and rounding to 1/16
+	 * of a pixel seems to solve all problems even with pixels of 7/80mm.
+	 */
+	x = round(x * 16.0) / 16.0;
+	y = round(y * 16.0) / 16.0;
+
 	x0 = (int)floor(x);
 	x1 = x0 + 1;
 
