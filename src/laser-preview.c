@@ -12,13 +12,13 @@
 /* default settings */
 #define DEFAULT_WIDTH            0
 #define DEFAULT_HEIGHT           0
-#define DEFAULT_LIN_DIFF         0.5
+#define DEFAULT_LIN_DIFF         0.25
 #define DEFAULT_PIX_SIZE         0.1
 
 /* clear wood: little absorption first, then takes way more once
  * already burnt.
  */
-#define DEFAULT_ABSORPTION        0.25
+#define DEFAULT_ABSORPTION        0.75
 #define DEFAULT_ABSORPTION_FACTOR 2.0
 
 const struct option long_options[] = {
@@ -486,9 +486,9 @@ void usage(int code, const char *cmd)
 	    "  -h --help                    show this help\n"
 	    "  -H --height <size>           output image minimum height in pixels (def: 0)\n"
 	    "  -W --width <size>            output image minimum width in pixels (def: 0)\n"
-	    "  -a --absorption <value>      absorption (def: 0.25 for clear wood)\n"
+	    "  -a --absorption <value>      absorption (def: 0.75 for clear wood)\n"
 	    "  -A --absorption_mul <value>  absorption factor once marked (def: 2.0 for wood)\n"
-	    "  -d --diffusion <value>       linear diffusion ratio (def: 0.5)\n"
+	    "  -d --diffusion <value>       linear diffusion ratio (def: 0.25)\n"
 	    "  -m --multiply <value>        multiply input value by this (def: 1.0)\n"
 	    "  -o --output <file>           output PNG file name (default: none=stdout)\n"
 	    "  -p --pixel-size <size>       pixel-size in millimeters (default: 0.1)\n"
