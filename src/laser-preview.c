@@ -110,6 +110,22 @@ int extend_img(struct img *img, int nx0, int ny0, int nx1, int ny1)
 	int ow, oh;
 	int x, y;
 
+	//printf("x0=%d->%d x1=%d->%d y0=%d->%d y1=%d->%d\n",
+	//       img->x0, nx0, img->x1, nx1, img->y0, ny0, img->y1, ny1);
+
+	/* make sure coordinates are not swapped */
+	if (nx0 > nx1) {
+		x = nx0;
+		nx0 = nx1;
+		nx1 = x;
+	}
+
+	if (ny0 > ny1) {
+		y = ny0;
+		ny0 = ny1;
+		ny1 = y;
+	}
+
 	if (nx0 > img->x0)
 		nx0 = img->x0;
 
