@@ -1,5 +1,6 @@
 /* Uses the simplified API, thus requires libpng 1.6 or above */
 #include <ctype.h>
+#include <getopt.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -8,6 +9,19 @@
 #include <string.h>
 #include <png.h>
 
+/* default settings */
+#define DEFAULT_WIDTH            1000
+#define DEFAULT_HEIGHT           1000
+#define DEFAULT_LIN_DIFF         0.5
+
+const struct option long_options[] = {
+	{"help",        no_argument,       0, 'h'              },
+	{"diffusion",   required_argument, 0, 'd'              },
+	{"width",       required_argument, 0, 'W'              },
+	{"height",      required_argument, 0, 'H'              },
+	{"output",      required_argument, 0, 'o'              },
+	{0,             0,                 0, 0                }
+};
 
 /* describes an image with upgradable dimensions, possibly supporting negative
  * coordinates.
@@ -443,6 +457,19 @@ int parse_gcode(struct img *img, FILE *file, float zoom, float power)
 	return 1;
 }
 
+void usage(int code, const char *cmd)
+{
+	die(code,
+	    "\n"
+	    "Usage: %s [options]*\n"
+	    "  -h --help                    show this help\n"
+	    "  -H --height <size>           output image minimum height in pixels (def: 1000)\n"
+	    "  -W --width <size>            output image minimum width in pixels (def: 1000)\n"
+	    "  -d --diffusion <value>       linear diffusion ratio (def: 0.5)\n"
+	    "  -o --output <file>           output PNG file name (default: none=stdout)\n"
+	    "\n", cmd);
+}
+
 int main(int argc, char **argv)
 {
 	uint8_t *buffer;
@@ -455,21 +482,49 @@ int main(int argc, char **argv)
 	memset(&img, 0, sizeof(img));
 
 	file = NULL;
-	w = 1000;
-	h = 1000;
-	img.diffusion_lin = 0.5;
+	w = DEFAULT_WIDTH;
+	h = DEFAULT_HEIGHT;
+	img.diffusion_lin = DEFAULT_LIN_DIFF;
 
-	if (argc > 1 && *argv[1])
-		file = argv[1];
+	while (1) {
+		int option_index = 0;
+		int c = getopt_long(argc, argv, "hd:o:W:H:", long_options, &option_index);
+		float arg_f = optarg ? atof(optarg) : 0.0;
+		int arg_i   = optarg ? atoi(optarg) : 0;
 
-	if (argc > 2)
-		w = atoi(argv[2]);
+		if (c == -1)
+			break;
 
-	if (argc > 3)
-		h = atoi(argv[3]);
+		switch (c) {
+		case 0: /* long option: long_options[option_index] with arg <optarg> */
+			break;
 
-	if (argc > 4)
-		img.diffusion_lin = atof(argv[4]);
+		case 'd':
+			img.diffusion_lin = arg_f;
+			break;
+
+		case 'h':
+			usage(0, argv[0]);
+			break;
+
+		case 'o' :
+			file = optarg;
+			break;
+
+		case 'W':
+			w = arg_i;
+			break;
+
+		case 'H':
+			h = arg_i;
+			break;
+			break;
+
+		case ':': /* missing argument */
+		case '?': /* unknown option */
+			die(1, "");
+		}
+	}
 
 	img.diffusion_dia = powf(img.diffusion_lin, sqrt(2));
 	img.diffusion = 1.0 / (1.0 + 4.0 * img.diffusion_dia + 4.0 * img.diffusion_lin);
