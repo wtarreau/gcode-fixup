@@ -26,6 +26,7 @@ const struct option long_options[] = {
 	{"diffusion",   required_argument, 0, 'd'              },
 	{"width",       required_argument, 0, 'W'              },
 	{"height",      required_argument, 0, 'H'              },
+	{"multiply",    required_argument, 0, 'm'              },
 	{"output",      required_argument, 0, 'o'              },
 	{"pixel-size",  required_argument, 0, 'p'              },
 	{0,             0,                 0, 0                }
@@ -488,6 +489,7 @@ void usage(int code, const char *cmd)
 	    "  -a --absorption <value>      absorption (def: 0.25 for clear wood)\n"
 	    "  -A --absorption_mul <value>  absorption factor once marked (def: 2.0 for wood)\n"
 	    "  -d --diffusion <value>       linear diffusion ratio (def: 0.5)\n"
+	    "  -m --multiply <value>        multiply input value by this (def: 1.0)\n"
 	    "  -o --output <file>           output PNG file name (default: none=stdout)\n"
 	    "  -p --pixel-size <size>       pixel-size in millimeters (default: 0.1)\n"
 	    "\n", cmd);
@@ -499,6 +501,7 @@ int main(int argc, char **argv)
 	const char *file;
 	struct img img;
 	double pixsize;
+	double multiply = 1.0;
 	int w, h;
 	int x, y;
 	int ret;
@@ -515,7 +518,7 @@ int main(int argc, char **argv)
 
 	while (1) {
 		int option_index = 0;
-		int c = getopt_long(argc, argv, "ha:A:d:o:p:W:H:", long_options, &option_index);
+		int c = getopt_long(argc, argv, "ha:A:d:m:o:p:W:H:", long_options, &option_index);
 		double arg_f = optarg ? atof(optarg) : 0.0;
 		int arg_i   = optarg ? atoi(optarg) : 0;
 
@@ -540,6 +543,10 @@ int main(int argc, char **argv)
 
 		case 'h':
 			usage(0, argv[0]);
+			break;
+
+		case 'm':
+			multiply = arg_f;
 			break;
 
 		case 'o' :
@@ -585,7 +592,7 @@ int main(int argc, char **argv)
 	//draw_vector(&img, 125, 125, 600, 600, 10.0);
 	//draw_vector(&img, 125, 125, 600, 500, 10.0);
 
-	if (!parse_gcode(&img, stdin, 1.0 / pixsize, 1.0))
+	if (!parse_gcode(&img, stdin, 1.0 / pixsize, multiply))
 		die(1, "failed to process gcode");
 
 	printf("x0=%d y0=%d x1=%d y1=%d\n", img.x0, img.y0, img.x1, img.y1);
