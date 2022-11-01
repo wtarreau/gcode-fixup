@@ -110,25 +110,23 @@ int extend_img(struct img *img, int nx0, int ny0, int nx1, int ny1)
 	int ow, oh;
 	int x, y;
 
-	if (img->area) {
-		if (nx0 > img->x0)
-			nx0 = img->x0;
+	if (nx0 > img->x0)
+		nx0 = img->x0;
 
-		if (ny0 > img->y0)
-			ny0 = img->y0;
+	if (ny0 > img->y0)
+		ny0 = img->y0;
 
-		if (nx1 < img->x1)
-			nx1 = img->x1;
+	if (nx1 < img->x1)
+		nx1 = img->x1;
 
-		if (ny1 < img->y1)
-			ny1 = img->y1;
+	if (ny1 < img->y1)
+		ny1 = img->y1;
 
-		if (nx0 == img->x0 && ny0 == img->y0 && nx1 == img->x1 && ny1 == img->y1)
-			return 1;
+	if (nx0 == img->x0 && ny0 == img->y0 && nx1 == img->x1 && ny1 == img->y1)
+		return 1;
 
-		ow = img->x1 + 1 - img->x0;
-		oh = img->y1 + 1 - img->y0;
-	}
+	ow = img->x1 + 1 - img->x0;
+	oh = img->y1 + 1 - img->y0;
 
 	nw = nx1 + 1 - nx0;
 	nh = ny1 + 1 - ny0;
