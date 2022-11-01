@@ -10,8 +10,8 @@
 #include <png.h>
 
 /* default settings */
-#define DEFAULT_WIDTH            1000
-#define DEFAULT_HEIGHT           1000
+#define DEFAULT_WIDTH            0
+#define DEFAULT_HEIGHT           0
 #define DEFAULT_LIN_DIFF         0.5
 #define DEFAULT_PIX_SIZE         0.1
 
@@ -469,8 +469,8 @@ void usage(int code, const char *cmd)
 	    "\n"
 	    "Usage: %s [options]*\n"
 	    "  -h --help                    show this help\n"
-	    "  -H --height <size>           output image minimum height in pixels (def: 1000)\n"
-	    "  -W --width <size>            output image minimum width in pixels (def: 1000)\n"
+	    "  -H --height <size>           output image minimum height in pixels (def: 0)\n"
+	    "  -W --width <size>            output image minimum width in pixels (def: 0)\n"
 	    "  -a --absorption <value>      absorption (def: 0.25 for clear wood)\n"
 	    "  -A --absorption_mul <value>  absorption factor once marked (def: 2.0 for wood)\n"
 	    "  -d --diffusion <value>       linear diffusion ratio (def: 0.5)\n"
