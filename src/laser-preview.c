@@ -215,25 +215,39 @@ static inline void add_to_pixel(struct img *img, int x0, int y0, float value)
 static inline int burn(struct img *img, float x, float y, float intensity)
 {
 	int x0, y0, x1, y1, w;
-	float dx, dy;
 	float s00, s01, s10, s11; // fraction of overlapping surface
 
-	w  = img->x1 - img->x0 + 1;
-	x0 = (int)(x - 0.5); x1 = x0 + 1;
-	y0 = (int)(y - 0.5); y1 = y0 + 1;
+	x0 = (int)floor(x);
+	x1 = x0 + 1;
+
+	y0 = (int)floor(y);
+	y1 = y0 + 1;
 
 	if (x0 < img->x0 || x1 > img->x1 || y0 < img->y0 || y1 > img->y1) {
 		if (!extend_img(img, x0, y0, x1, y1))
 			return 0;
 	}
 
-	dx = x1 - x;
-	dy = y1 - y;
+	w  = img->x1 - img->x0 + 1;
 
-	s00 = (0.5 + dx) * (0.5 + dy);
-	s01 = (0.5 + dx) * (0.5 - dy);
-	s10 = (0.5 - dx) * (0.5 + dy);
-	s11 = (0.5 - dx) * (0.5 - dy);
+	/* We consider that pixels are centered like this:
+	 * x=0 y=0 : covers area [0,0]->]1,1[ centered on (0.5, 0.5)
+	 * x=1 y=0 : covers area [0,1]->]2,1[ centered on (1.5, 0.5)
+	 * x=0 y=1 : covers area [0,1]->]1,2[ centered on (0.5, 1.5)
+	 * x=1 y=1 : covers area [1,1]->]2,2[ centered on (1.5, 1.5)
+	 *
+	 * The distance between the point and the center of the pixel is
+	 * sqrt((px-x)^2 + (py-y)^2) where (x,y) are expected to be shifted
+	 * by 0.5 up so that (x=0, y=0) exactly matches pixel [0,0].
+	 * The distance cannot exceed sqrt(2), thus we normalize it so that
+	 * (1-distance) gives the intensity for each pixel.
+	 */
+
+	x += 0.5; y += 0.5;
+	s00 = 1.0 - sqrt(((x0 - x) * (x0 - x) + (y0 - y) * (y0 - y)) / 2);
+	s01 = 1.0 - sqrt(((x1 - x) * (x1 - x) + (y0 - y) * (y0 - y)) / 2);
+	s10 = 1.0 - sqrt(((x0 - x) * (x0 - x) + (y1 - y) * (y1 - y)) / 2);
+	s11 = 1.0 - sqrt(((x1 - x) * (x1 - x) + (y1 - y) * (y1 - y)) / 2);
 
 	/* next steps: count energy delivered by the beam as intensity * time * ratio * absorption.
 	 * For now, time has to be passed as part of the intensity by the caller. The absorption
