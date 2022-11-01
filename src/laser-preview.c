@@ -180,14 +180,17 @@ int extend_img(struct img *img, int nx0, int ny0, int nx1, int ny1)
 /* add energy <value> to pixel at <x,y> */
 static inline void add_to_pixel(struct img *img, int x0, int y0, float value)
 {
-	if (x0 < img->x0)
-		extend_img(img, x0, img->y0, img->x1, img->y1);
-	if (x0 > img->x1)
-		extend_img(img, img->x0, img->y0, x0, img->y1);
-	if (y0 < img->y0)
-		extend_img(img, img->x0, y0, img->x1, img->y1);
-	if (y0 > img->y1)
-		extend_img(img, img->x0, img->y0, img->x1, y0);
+	int nx0, ny0, nx1, ny1;
+
+	nx0 = (x0 < img->x0) ? x0 : img->x0;
+	nx1 = (x0 > img->x1) ? x0 : img->x1;
+	ny0 = (y0 < img->y0) ? y0 : img->y0;
+	ny1 = (y0 > img->y1) ? y0 : img->y1;
+
+	if (nx0 != img->x0 || nx1 != img->x1 || ny0 != img->y0 || ny1 != img->y1) {
+		if (!extend_img(img, nx0, ny0, nx1, ny1))
+			return;
+	}
 
 	img->area[(y0 - img->y0) * (img->x1 - img->x0 + 1) + (x0 - img->x0)] += value * img->diffusion;
 
