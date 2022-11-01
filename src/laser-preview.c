@@ -457,10 +457,10 @@ int parse_gcode(struct img *img, FILE *file, double zoom, float power)
 					drawing = 0;
 			}
 			else if (*p == 'X') {
-				new_x = val;
+				new_x = floor(val * zoom);
 			}
 			else if (*p == 'Y') {
-				new_y = val;
+				new_y = floor(val * zoom);
 			}
 			else if (*p == 'S') {
 				cur_s = val;
@@ -468,7 +468,7 @@ int parse_gcode(struct img *img, FILE *file, double zoom, float power)
 		}
 
 		if (drawing && (new_x != cur_x || new_y != cur_y)) {
-			draw_vector(img, cur_x * zoom, cur_y * zoom, new_x * zoom, new_y * zoom, cur_s / 255.0 * power);
+			draw_vector(img, cur_x, cur_y, new_x, new_y, cur_s / 255.0 * power);
 		}
 
 		cur_x = new_x;
