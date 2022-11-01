@@ -137,10 +137,9 @@ int extend_img(struct img *img, int nx0, int ny0, int nx1, int ny1)
 
 	if (img->area) {
 		for (y = img->y0; y <= img->y1; y++) {
-			for (x = img->x0; x <= img->x1; x++) {
-				new_area[(y - ny0) * nw + (x - nx0)] =
-					img->area[(y - img->y0) * ow + (x - img->x0)];
-			}
+			memcpy(&new_area[(y - ny0) * nw + (img->x0 - nx0)],
+			       &img->area[(y - img->y0) * ow],
+			       ow * sizeof(*new_area));
 		}
 		free(img->area);
 	}
