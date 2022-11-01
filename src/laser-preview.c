@@ -378,7 +378,7 @@ int draw_vector(struct img *img, double x0, double y0, double x1, double y1, dou
 
 		for (x = x0 + 0.5; x < x1 + 0.5; x += 1.0) {
 			/* aim the beam at (x,y) */
-			y = y0 + (x - x0 + 0.5 /* for mid-trip */) * dy / dx;
+			y = y0 + 0.5 + (x - x0 + 0.5 /* for mid-trip */) * dy / dx;
 			/* So beam overlaps with (x-0.5,y-0.5,x+0.5,y+0.5) */
 			if (!burn(img, x, y, intensity))
 				return 0;
@@ -395,7 +395,7 @@ int draw_vector(struct img *img, double x0, double y0, double x1, double y1, dou
 
 		for (y = y0 + 0.5; y < y1 + 0.5; y += 1.0) {
 			/* aim the beam at (x, y+0.5) */
-			x = x0 + (y - y0 + 0.5 /* for mid-trip */) * dx / dy;
+			x = x0 + 0.5 + (y - y0 + 0.5 /* for mid-trip */) * dx / dy;
 			/* So beam overlaps with (x-0.5,y-0.5,x+0.5,y+0.5) */
 			if (!burn(img, x, y, intensity))
 				return 0;
