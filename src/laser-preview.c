@@ -44,6 +44,7 @@ struct img {
 	float diffusion_lin;     // linear diffusion (ratio of power sent over 1px dist)
 	float diffusion_dia;     // diagonal diffusion (lin^sqrt(2)).
 	float diffusion;         // diffusion factor so that 4lin+4dia+diff == 1.0
+	double pixel_size;       // pixel size in mm
 };
 
 
@@ -500,7 +501,6 @@ int main(int argc, char **argv)
 	uint8_t *buffer;
 	const char *file;
 	struct img img;
-	double pixsize;
 	double multiply = 1.0;
 	int w, h;
 	int x, y;
@@ -511,7 +511,7 @@ int main(int argc, char **argv)
 	file = NULL;
 	w = DEFAULT_WIDTH;
 	h = DEFAULT_HEIGHT;
-	pixsize = DEFAULT_PIX_SIZE;;
+	img.pixel_size = DEFAULT_PIX_SIZE;
 	img.diffusion_lin = DEFAULT_LIN_DIFF;
 	img.absorption = DEFAULT_ABSORPTION;
 	img.absorption_factor = DEFAULT_ABSORPTION_FACTOR;
@@ -555,7 +555,7 @@ int main(int argc, char **argv)
 
 		case 'p':
 			if (arg_f > 0.0)
-				pixsize = arg_f;
+				img.pixel_size = arg_f;
 			break;
 
 		case 'W':
@@ -592,7 +592,7 @@ int main(int argc, char **argv)
 	//draw_vector(&img, 125, 125, 600, 600, 10.0);
 	//draw_vector(&img, 125, 125, 600, 500, 10.0);
 
-	if (!parse_gcode(&img, stdin, 1.0 / pixsize, multiply))
+	if (!parse_gcode(&img, stdin, 1.0 / img.pixel_size, multiply))
 		die(1, "failed to process gcode");
 
 	printf("x0=%d y0=%d x1=%d y1=%d\n", img.x0, img.y0, img.x1, img.y1);
