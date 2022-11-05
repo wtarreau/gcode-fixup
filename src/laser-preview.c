@@ -14,6 +14,7 @@
 #define DEFAULT_HEIGHT           0
 #define DEFAULT_LIN_DIFF         0.25
 #define DEFAULT_PIX_SIZE         0.1
+#define DEFAULT_BEAM_POWER       10.0
 
 /* clear wood: little absorption first, then takes way more once
  * already burnt.
@@ -29,6 +30,7 @@ const struct option long_options[] = {
 	{"multiply",    required_argument, 0, 'm'              },
 	{"output",      required_argument, 0, 'o'              },
 	{"pixel-size",  required_argument, 0, 'p'              },
+	{"beam-power",  required_argument, 0, 'P'              },
 	{0,             0,                 0, 0                }
 };
 
@@ -45,6 +47,7 @@ struct img {
 	float diffusion_dia;     // diagonal diffusion (lin^sqrt(2)).
 	float diffusion;         // diffusion factor so that 4lin+4dia+diff == 1.0
 	double pixel_size;       // pixel size in mm
+	float beam_power;        // beam power in watts
 };
 
 
@@ -488,6 +491,7 @@ void usage(int code, const char *cmd)
 	    "  -H --height <size>           output image minimum height in pixels (def: 0)\n"
 	    "  -W --width <size>            output image minimum width in pixels (def: 0)\n"
 	    "  -a --absorption <value>      absorption (def: 0.75 for clear wood)\n"
+	    "  -b --beam-power <value>      beam power in Watts (default: 10)\n"
 	    "  -A --absorption_mul <value>  absorption factor once marked (def: 2.0 for wood)\n"
 	    "  -d --diffusion <value>       linear diffusion ratio (def: 0.25)\n"
 	    "  -m --multiply <value>        multiply input value by this (def: 1.0)\n"
@@ -515,10 +519,11 @@ int main(int argc, char **argv)
 	img.diffusion_lin = DEFAULT_LIN_DIFF;
 	img.absorption = DEFAULT_ABSORPTION;
 	img.absorption_factor = DEFAULT_ABSORPTION_FACTOR;
+	img.beam_power = DEFAULT_BEAM_POWER;
 
 	while (1) {
 		int option_index = 0;
-		int c = getopt_long(argc, argv, "ha:A:d:m:o:p:W:H:", long_options, &option_index);
+		int c = getopt_long(argc, argv, "ha:A:d:m:o:p:P:W:H:", long_options, &option_index);
 		double arg_f = optarg ? atof(optarg) : 0.0;
 		int arg_i   = optarg ? atoi(optarg) : 0;
 
@@ -556,6 +561,10 @@ int main(int argc, char **argv)
 		case 'p':
 			if (arg_f > 0.0)
 				img.pixel_size = arg_f;
+			break;
+
+		case 'P':
+			img.beam_power = arg_f;
 			break;
 
 		case 'W':
