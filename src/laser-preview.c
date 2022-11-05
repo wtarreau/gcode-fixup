@@ -435,7 +435,7 @@ int parse_gcode(struct img *img, FILE *file, double zoom, float power)
 				p++;
 
 			for (e = p; *e; e++) {
-				if (*e == '\n') {
+				if (*e == '\n' || *e == ';') {
 					*e = 0;
 					break;
 				}
