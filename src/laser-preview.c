@@ -247,6 +247,8 @@ static inline int burn(struct img *img, double x, double y, float intensity)
 {
 	int x0, y0, x1, y1, w;
 	float s00, s01, s10, s11; // fraction of overlapping surface
+	float t00, t01, t10, t11; // energy thresholds to mark the pixel
+	float pix_energy;         // pixel energy in J
 	double dx, dy;
 
 	/* depending on the rounding resulting from non-integer pixel sizes, we
@@ -291,8 +293,8 @@ static inline int burn(struct img *img, double x, double y, float intensity)
 	s10 =       (dx) *       (dy);
 	s11 = (1.0 - dx) *       (dy);
 
-	//printf("x=%1.2f x0=%d x1=%d y=%1.2f y0=%d y1=%d s00=%1.1f s01=%1.1f s10=%1.1f s11=%1.1f\n",
-	//       x, x0, x1, y, y0, y1, s00, s01, s10, s11);
+	//printf("x=%1.2f x0=%d x1=%d y=%1.2f y0=%d y1=%d s00=%1.1f s01=%1.1f s10=%1.1f s11=%1.1f dx=%1.1f dy=%1.1f\n",
+	//       x, x0, x1, y, y0, y1, s00, s01, s10, s11, dx, dy);
 
 	/* next steps: count energy delivered by the beam as intensity * time * ratio * absorption.
 	 * For now, time has to be passed as part of the intensity by the caller. The absorption
@@ -306,6 +308,11 @@ static inline int burn(struct img *img, double x, double y, float intensity)
 	s10 *= img->absorption + img->absorption_factor * img->area[(y1 - img->y0) * w + (x0 - img->x0)];
 	s11 *= img->absorption + img->absorption_factor * img->area[(y1 - img->y0) * w + (x1 - img->x0)];
 
+	t00 = img->energy_density * (1.0 - sqrt(img->area[(y0 - img->y0) * w + (x0 - img->x0)]));
+	t01 = img->energy_density * (1.0 - sqrt(img->area[(y0 - img->y0) * w + (x1 - img->x0)]));
+	t10 = img->energy_density * (1.0 - sqrt(img->area[(y1 - img->y0) * w + (x0 - img->x0)]));
+	t11 = img->energy_density * (1.0 - sqrt(img->area[(y1 - img->y0) * w + (x1 - img->x0)]));
+
 	if (img->absorption_factor < 0.0) {
 		if (s00 < 0.0) s00 = 0.0;
 		if (s01 < 0.0) s01 = 0.0;
@@ -313,24 +320,32 @@ static inline int burn(struct img *img, double x, double y, float intensity)
 		if (s11 < 0.0) s11 = 0.0;
 	}
 
-	if (s00 > 1.0) s00 = 1.0;
-	if (s01 > 1.0) s01 = 1.0;
-	if (s10 > 1.0) s10 = 1.0;
-	if (s11 > 1.0) s11 = 1.0;
-
 	s00 *= intensity;
 	s01 *= intensity;
 	s10 *= intensity;
 	s11 *= intensity;
 
+	if (s00 > 1.0) s00 = 1.0;
+	if (s01 > 1.0) s01 = 1.0;
+	if (s10 > 1.0) s10 = 1.0;
+	if (s11 > 1.0) s11 = 1.0;
+
+	/* let's calculate this pixel's energy and the marking threshold */
+	pix_energy = intensity * img->pixel_energy;
+
+	//printf("pix_energy=%1.6f t01=%1.6f s01=%1.6f\n", pix_energy, t01, s01);
 	/* now sXX contains the amount of energy delivered over pixel XX. For
 	 * now we don't really care if areas are overburnt, better properly
 	 * count the delivered energy.
 	 */
-	add_to_pixel(img, x0, y0, s00);
-	add_to_pixel(img, x1, y0, s01);
-	add_to_pixel(img, x0, y1, s10);
-	add_to_pixel(img, x1, y1, s11);
+	if (pix_energy >= t00)
+		add_to_pixel(img, x0, y0, s00);
+	if (pix_energy >= t01)
+		add_to_pixel(img, x1, y0, s01);
+	if (pix_energy >= t10)
+		add_to_pixel(img, x0, y1, s10);
+	if (pix_energy >= t11)
+		add_to_pixel(img, x1, y1, s11);
 
 	/* Then we have diffusion to surrounding pixels, which is a function of their distance
 	 * and depends on the material. Long dispersion means the energy is exchanged to other
