@@ -14,7 +14,8 @@
 #define DEFAULT_HEIGHT           0
 #define DEFAULT_LIN_DIFF         0.25
 #define DEFAULT_PIX_SIZE         0.1
-#define DEFAULT_BEAM_POWER       10.0
+#define DEFAULT_BEAM_POWER       10.0    // Watts
+#define DEFAULT_ENERGY_DENSITY   0.5     // J/mm^2
 
 /* clear wood: little absorption first, then takes way more once
  * already burnt.
@@ -31,6 +32,7 @@ const struct option long_options[] = {
 	{"output",      required_argument, 0, 'o'              },
 	{"pixel-size",  required_argument, 0, 'p'              },
 	{"beam-power",  required_argument, 0, 'P'              },
+	{"energy-density", required_argument, 0, 'e'           },
 	{0,             0,                 0, 0                }
 };
 
@@ -49,6 +51,7 @@ struct img {
 	double pixel_size;       // pixel size in mm
 	float pixel_energy;      // energy per pixel in Joule
 	float beam_power;        // beam power in watts
+	float energy_density;    // minimum marking energy in J/px^2
 };
 
 
@@ -498,6 +501,7 @@ void usage(int code, const char *cmd)
 	    "  -W --width <size>            output image minimum width in pixels (def: 0)\n"
 	    "  -a --absorption <value>      absorption (def: 0.75 for clear wood)\n"
 	    "  -b --beam-power <value>      beam power in Watts (default: 10)\n"
+	    "  -e --energy-density <value>  minimum energy density in J/mm^2 (def: 0.5)\n"
 	    "  -A --absorption_mul <value>  absorption factor once marked (def: 2.0 for wood)\n"
 	    "  -d --diffusion <value>       linear diffusion ratio (def: 0.25)\n"
 	    "  -m --multiply <value>        multiply input value by this (def: 1.0)\n"
@@ -511,6 +515,7 @@ int main(int argc, char **argv)
 	uint8_t *buffer;
 	const char *file;
 	struct img img;
+	float energy_density = DEFAULT_ENERGY_DENSITY;
 	double multiply = 1.0;
 	int w, h;
 	int x, y;
@@ -529,7 +534,7 @@ int main(int argc, char **argv)
 
 	while (1) {
 		int option_index = 0;
-		int c = getopt_long(argc, argv, "ha:A:d:m:o:p:P:W:H:", long_options, &option_index);
+		int c = getopt_long(argc, argv, "ha:A:d:e:m:o:p:P:W:H:", long_options, &option_index);
 		double arg_f = optarg ? atof(optarg) : 0.0;
 		int arg_i   = optarg ? atoi(optarg) : 0;
 
@@ -550,6 +555,10 @@ int main(int argc, char **argv)
 
 		case 'd':
 			img.diffusion_lin = arg_f;
+			break;
+
+		case 'e':
+			energy_density = arg_f;
 			break;
 
 		case 'h':
@@ -588,6 +597,7 @@ int main(int argc, char **argv)
 		}
 	}
 
+	img.energy_density = energy_density * img.pixel_size * img.pixel_size;
 	img.diffusion_dia = powf(img.diffusion_lin, sqrt(2));
 	img.diffusion = 1.0 / (1.0 + 4.0 * img.diffusion_dia + 4.0 * img.diffusion_lin);
 	/* thus we have diff*(1+4*dia+4*lin) = 1 */
