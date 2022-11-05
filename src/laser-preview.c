@@ -47,6 +47,7 @@ struct img {
 	float diffusion_dia;     // diagonal diffusion (lin^sqrt(2)).
 	float diffusion;         // diffusion factor so that 4lin+4dia+diff == 1.0
 	double pixel_size;       // pixel size in mm
+	float pixel_energy;      // energy per pixel in Joule
 	float beam_power;        // beam power in watts
 };
 
@@ -469,6 +470,11 @@ int parse_gcode(struct img *img, FILE *file, double zoom, float power)
 			}
 			else if (*p == 'S') {
 				cur_s = val;
+			}
+			else if (*p == 'F' && val > 0.0) {
+				// speed in mm/mn. Div 60 for mm/s. Power in Watts = J/s.
+				// pxsz in mm/px, thus P/(F/60) = J/mm. P*pxsz*60/F = J/px.
+				img->pixel_energy = img->beam_power * img->pixel_size * 60.0 / val;
 			}
 		}
 
